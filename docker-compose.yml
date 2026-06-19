@@ -1,0 +1,33 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+  # celery:
+  #   build: ./backend
+  #   command: celery -A app.celery_worker worker --loglevel=info
+  celery:
+    build: ./backend
+    command: celery -A app.celery_worker.celery worker --loglevel=info
+    depends_on:
+      - redis
+    env_file:
+      - .env
+
+  redis:
+    image: redis
+
+  db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+  
+  frontend:
+    build: ./frontend-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend

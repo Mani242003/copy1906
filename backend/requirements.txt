@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+google-generativeai
+celery
+redis
+psycopg2-binary
+sqlalchemy
+chromadb
+requests
+python-dotenv
+email-validator
