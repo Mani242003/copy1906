@@ -2,16 +2,7 @@ import requests
 import os
 import time
 
-REPO = "Mani242003/Dummy_repo"
-
-WORKFLOWS = {
-    "frontend_build": "frontend-build-dispatch.yml",
-    "frontend_deploy": "frontend-deploy-dispatch.yml",
-    "backend_build": "backend-build-dispatch.yml",
-    "backend_deploy": "backend-deploy-dispatch.yml"
-}
-
-# ---------------- PAYLOADS ----------------
+# ✅ ----------- PAYLOAD FUNCTIONS -----------
 
 def frontend_build_payload(release):
     return {
@@ -59,10 +50,14 @@ def backend_deploy_payload():
         "runner": "ubuntu-latest"
     }
 
-# ---------------- API CALL ----------------
 
-def trigger_github_call(workflow_file, payload):
-    url = f"https://api.github.com/repos/{REPO}/actions/workflows/{workflow_file}/dispatches"
+# ✅ ----------- CORE GITHUB API CALL -----------
+
+def call_github(repo, workflow_file, payload):
+
+    workflow_file = workflow_file.strip()
+
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_file}/dispatches"
 
     headers = {
         "Authorization": f"token {os.getenv('GITHUB_TOKEN')}",
@@ -76,32 +71,78 @@ def trigger_github_call(workflow_file, payload):
 
     res = requests.post(url, json=data, headers=headers)
 
-    print(f"🚀 Triggered: {workflow_file} | Status: {res.status_code}")
-    print("📦 PAYLOAD:", payload)
+    print("🚀 Triggered:", workflow_file)
+    print("STATUS:", res.status_code)
+    print("URL:", url)
+    print("PAYLOAD:", payload)
 
     if res.status_code != 204:
         print("❌ ERROR:", res.text)
 
-    return res.status_code
+
+# ✅ ----------- BUILD / DEPLOY DECIDER (TYPE‑1 ONLY) -----------
+
+def trigger_workflow(action, component, release, repo, workflows):
+
+    print(f"🔥 ACTION: {action} | COMPONENT: {component}")
+
+    # ✅ FRONTEND
+    if component == "frontend":
+
+        if action == "build":
+            call_github(
+                repo,
+                workflows["frontend_build"],
+                frontend_build_payload(release)
+            )
+
+        elif action == "deploy":
+            call_github(
+                repo,
+                workflows["frontend_deploy"],
+                frontend_deploy_payload()
+            )
+
+    # ✅ BACKEND
+    elif component == "backend":
+
+        if action == "build":
+            call_github(
+                repo,
+                workflows["backend_build"],
+                backend_build_payload(release)
+            )
+
+        elif action == "deploy":
+            call_github(
+                repo,
+                workflows["backend_deploy"],
+                backend_deploy_payload()
+            )
 
 
-def get_old_run_ids(workflow_file):
-    url = f"https://api.github.com/repos/{REPO}/actions/workflows/{workflow_file}/runs"
+# ✅ ----------- GET OLD RUN IDS -----------
+
+def get_old_run_ids(repo, workflow_file):
+
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_file}/runs"
 
     headers = {
         "Authorization": f"token {os.getenv('GITHUB_TOKEN')}"
     }
 
     res = requests.get(url, headers=headers).json()
-    runs = res.get("workflow_runs", [])
 
-    return [run["id"] for run in runs]
+    return [run["id"] for run in res.get("workflow_runs", [])]
 
 
-def wait_for_build_completion(workflow_file, old_ids):
-    print(f"⏳ Waiting for new run of {workflow_file}...")
+# ✅ ----------- WAIT FOR BUILD COMPLETION -----------
 
-    url = f"https://api.github.com/repos/{REPO}/actions/workflows/{workflow_file}/runs"
+def wait_for_build_completion(repo, workflow_file, old_ids):
+
+    print(f"⏳ Waiting for {workflow_file} completion...")
+
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_file}/runs"
 
     headers = {
         "Authorization": f"token {os.getenv('GITHUB_TOKEN')}"
@@ -109,27 +150,27 @@ def wait_for_build_completion(workflow_file, old_ids):
 
     new_run_id = None
 
-    while True:
-        res = requests.get(url, headers=headers).json()
-        runs = res.get("workflow_runs", [])
+    # ✅ STEP 1 → Detect new run
+    while not new_run_id:
 
-        for run in runs:
+        res = requests.get(url, headers=headers).json()
+
+        for run in res.get("workflow_runs", []):
             if run["id"] not in old_ids:
                 new_run_id = run["id"]
                 print("✅ New run detected:", new_run_id)
                 break
 
-        if new_run_id:
-            break
-
         time.sleep(3)
 
+    # ✅ STEP 2 → Track status
     while True:
-        res = requests.get(url, headers=headers).json()
-        runs = res.get("workflow_runs", [])
 
-        for run in runs:
+        res = requests.get(url, headers=headers).json()
+
+        for run in res.get("workflow_runs", []):
             if run["id"] == new_run_id:
+
                 status = run["status"]
                 conclusion = run["conclusion"]
 
@@ -139,84 +180,3 @@ def wait_for_build_completion(workflow_file, old_ids):
                     return conclusion == "success"
 
         time.sleep(5)
-
-
-# ---------------- MAIN FUNCTION ----------------
-
-def trigger_workflow(action, component, release):
-
-    print("\n==== MAIN FLOW ====")
-    print("Component:", component)
-    print("Action:", action)
-
-    # ---------------- FRONTEND ----------------
-    if component == "frontend":
-
-        if action == "build":
-            trigger_github_call(WORKFLOWS["frontend_build"], frontend_build_payload(release))
-
-        elif action == "deploy":
-            trigger_github_call(WORKFLOWS["frontend_deploy"], frontend_deploy_payload())
-
-        elif action == "build_deploy":
-
-            print("✅ FRONTEND BUILD → WAIT → DEPLOY")
-
-            old_ids = get_old_run_ids(WORKFLOWS["frontend_build"])
-
-            status = trigger_github_call(
-                WORKFLOWS["frontend_build"],
-                frontend_build_payload(release)
-            )
-
-            if status == 204:
-                success = wait_for_build_completion(
-                    WORKFLOWS["frontend_build"],
-                    old_ids
-                )
-
-                if success:
-                    print("✅ Build success → Deploying now")
-
-                    # ✅ FIXED HERE
-                    trigger_github_call(
-                        WORKFLOWS["frontend_deploy"],
-                        frontend_deploy_payload()
-                    )
-                else:
-                    print("❌ Build failed → Deploy skipped")
-
-    # ---------------- BACKEND ----------------
-    elif component == "backend":
-
-        if action == "build":
-            trigger_github_call(WORKFLOWS["backend_build"], backend_build_payload(release))
-
-        elif action == "deploy":
-            trigger_github_call(WORKFLOWS["backend_deploy"], backend_deploy_payload())
-
-        elif action == "build_deploy":
-
-            print("✅ BACKEND BUILD → WAIT → DEPLOY")
-
-            old_ids = get_old_run_ids(WORKFLOWS["backend_build"])
-
-            status = trigger_github_call(
-                WORKFLOWS["backend_build"],
-                backend_build_payload(release)
-            )
-
-            if status == 204:
-                success = wait_for_build_completion(
-                    WORKFLOWS["backend_build"],
-                    old_ids
-                )
-
-                if success:
-                    print("✅ Build success → Deploying now")
-                    trigger_github_call(
-                        WORKFLOWS["backend_deploy"],
-                        backend_deploy_payload()
-                    )
-                else:
-                    print("❌ Build failed → Deploy skipped")

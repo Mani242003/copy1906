@@ -1,26 +1,20 @@
-from celery_worker import celery
-from app.github import get_runs, get_logs
-from app.database import save_record
-from app.notification import notify
-from app.rag import store_logs, query_logs
-from app.ai_agent import analyze_failure
+from sqlalchemy import Column, Integer, String, Text
+from app.database import Base
 
-@celery.task(bind=True, max_retries=10)
-def monitor_pipeline(self, parsed):
-    runs = get_runs()
-    run = runs['workflow_runs'][0]
+class Project(Base):
+    __tablename__ = "projects"
 
-    if run['status'] != "completed":
-        raise self.retry(countdown=30)
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    repo = Column(String)
+    workflows = Column(Text)
 
-    if run['conclusion'] == "success":
-        save_record(parsed, run['id'], "SUCCESS")
-        notify("SUCCESS", parsed)
-    else:
-        logs = get_logs(run['id'])
-        store_logs(logs)
-        context = query_logs("error")
-        rca = analyze_failure(context)
 
-        save_record(parsed, run['id'], "FAILED")
-        notify("FAILED", parsed, rca)
+class Deployment(Base):
+    __tablename__ = "deployments"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer)
+    component = Column(String)
+    action = Column(String)
+    status = Column(String)

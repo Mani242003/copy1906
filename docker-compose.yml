@@ -16,14 +16,18 @@ services:
       - redis
     env_file:
       - .env
-
   redis:
     image: redis
-
+    ports:
+      - "6379:6379"   # ✅ MUST BE PRESENT
   db:
     image: postgres
     environment:
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: 12345
+    ports:
+      - "5432:5432"
   
   frontend:
     build: ./frontend-ui
