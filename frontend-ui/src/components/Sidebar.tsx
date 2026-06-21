@@ -13,16 +13,7 @@ export default function Sidebar({ workflows }: any){
       <Link className="block mb-2 hover:text-blue-400" to={`/project/${id}/workflows`}>Workflows</Link>
       <Link className="block mb-2 hover:text-blue-400" to={`/project/${id}/deploy`}>Deploy</Link>
 
-      {workflows && (
-        <>
-          <h4 className="mt-5 font-semibold">Workflow Files</h4>
-
-          {Object.values(workflows).map((file:any, i)=>(
-            <div key={i} className="text-sm mt-1">📄 {file}</div>
-          ))}
-        </>
-      )}
-
+   
     </div>
   );
 }

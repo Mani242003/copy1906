@@ -7,8 +7,9 @@ class Project(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
     repo = Column(String)
-    type = Column(String)              # ✅ ADD
     workflows = Column(Text)
+
+    saved_values = Column(Text)   # ✅ REQUIRED
 
 class Deployment(Base):
     __tablename__ = "deployments"

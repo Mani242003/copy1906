@@ -8,19 +8,22 @@ import Deploy from "./pages/Deploy";
 import Workflows from "./pages/Workflows.tsx";
 import { store } from "./store/store.ts";
 import ProjectHome from "./pages/ProjectHome.tsx";
-
+import EditProject from "./pages/EditProject.tsx";
 export default function App() {
   return (
     <Provider store={store}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/create" element={<CreateProject />} />
-          <Route path="/project/:id" element={<ProjectHome />} />
-          <Route path="/project/:id/deploy" element={<Deploy />} />
-          <Route path="/project/:id/workflows" element={<Workflows />} />
-        </Routes>
+       <Routes>
+  <Route path="/" element={<Login />} />
+  <Route path="/projects" element={<Projects />} />
+  <Route path="/create" element={<CreateProject />} />
+
+  {/* ✅ CLEAN ROUTES */}
+  <Route path="/deploy/:id" element={<Deploy />} />
+  <Route path="/workflow/:id" element={<Workflows />} />
+
+  <Route path="/edit/:id" element={<EditProject />} />
+</Routes>
       </BrowserRouter>
     </Provider>
   );
