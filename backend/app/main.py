@@ -22,13 +22,15 @@ def startup():
     Base.metadata.create_all(bind=engine)
 
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],   # ✅ TEMP FIX (or keep localhost later)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ✅ LOGIN
 
