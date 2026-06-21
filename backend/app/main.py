@@ -5,7 +5,7 @@ from app.models import Project, Deployment
 from app.celery_worker import trigger_deployment
 from app.ai_agent import parse_command
 import json
-
+from app.ai_analysis import analyze_logs
 from app.parser import parse_workflow_inputs
 from app.github import get_workflows
 
@@ -22,7 +22,6 @@ def startup():
     Base.metadata.create_all(bind=engine)
 
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],   # ✅ TEMP FIX (or keep localhost later)
@@ -32,7 +31,29 @@ app.add_middleware(
 )
 
 
-# ✅ LOGIN
+@app.get("/deployments/{project_id}")
+def get_deployments(project_id: int):
+
+    db = SessionLocal()
+    try:
+        deps = db.query(Deployment)\
+            .filter(Deployment.project_id == project_id)\
+            .order_by(Deployment.id.desc())\
+            .all()
+
+        return [
+            {
+                "id": d.id,
+                "workflow": d.workflow,
+                "status": d.status,
+                "inputs": d.inputs,
+                "logs": d.logs,
+                "chat_history": d.chat_history
+            }
+            for d in deps
+        ]
+    finally:
+        db.close()
 
 
 @app.post("/login")
@@ -98,6 +119,7 @@ def save_workflow(project_id: int, workflows: dict):
 
 # ✅ DEPLOY (FIXED)
 
+
 @app.post("/deploy")
 def deploy(data: dict):
 
@@ -111,37 +133,46 @@ def deploy(data: dict):
 
     workflow = workflows[selected_key]
 
-    # ✅ VALID WORKFLOW CHECK
     if not workflow.get("fields"):
         return {"msg": "This workflow cannot be triggered ❌"}
 
-    # ✅ GET SAVED VALUES (DO NOT CHANGE)
     workflow_values = saved_values.get(selected_key, {})
 
-    # ✅ ✅ ✅ VALIDATION (THIS IS THE ONLY NEW PART)
     missing = []
-
     for field in workflow.get("fields", []):
         if not workflow_values.get(field["key"]):
             missing.append(field["key"])
 
     if missing:
-        # ✅ STOP BEFORE CELERY
         return {"msg": f"Missing required inputs: {', '.join(missing)} ❌"}
 
-    # ✅ SAFE TO TRIGGER
+    # ✅ ✅ ✅ NEW: SAVE DEPLOYMENT (RUNNING)
+    new_dep = Deployment(
+        project_id=project.id,
+        workflow=selected_key,
+        status="running",
+        inputs=json.dumps(workflow_values)
+    )
+
+    db.add(new_dep)
+    db.commit()
+    db.refresh(new_dep)
+
+    # ✅ PASS dep_id to celery
     trigger_deployment.delay(
         workflow_values,
         workflow["file"],
-        project.repo
+        project.repo,
+        new_dep.id   # ✅ NEW
     )
 
     return {"msg": "triggered"}
 
-@app.get("/deployments")
-def get_deployments():
-    db = SessionLocal()
-    return db.query(Deployment).all()
+
+# @app.get("/deployments")
+# def get_deployments():
+#     db = SessionLocal()
+#     return db.query(Deployment).all()
 
 
 @app.delete("/project/{id}")
@@ -192,9 +223,88 @@ def workflows(repo: str):
 
         result[f["name"]] = {
             "file": f["file"],
-            
+
             "fields": fields
         }
 
     return result
 
+
+@app.post("/retry/{dep_id}")
+def retry(dep_id: int):
+
+    db = SessionLocal()
+
+    try:
+        dep = db.query(Deployment).get(dep_id)
+
+        project = db.query(Project).get(dep.project_id)
+
+        workflows = json.loads(project.workflows)
+
+        workflow = workflows[dep.workflow]
+
+        inputs = json.loads(dep.inputs or "{}")
+
+        # ✅ UPDATE SAME RECORD
+        dep.status = "running"
+        dep.logs = None
+
+        # ✅ DO NOT CLEAR CHAT
+        # REMOVE THIS LINE COMPLETELY
+
+        # dep.chat_history = None   ❌ REMOVE
+        print("✅ AFTER SAVE CHAT:", dep.chat_history[:200])
+
+        db.commit()
+
+        # ✅ TRIGGER SAME DEPLOY ID
+        trigger_deployment.delay(
+            inputs,
+            workflow["file"],
+            project.repo,
+            dep.id   # ✅ SAME ID
+        )
+
+        return {"msg": "retry started"}
+
+    finally:
+        db.close()
+
+
+@app.post("/ai/analyze")
+def analyze(data: dict):
+
+    logs = data.get("logs", "")
+
+    try:
+        result = analyze_logs(logs)
+
+        return {
+            "result": result
+        }
+
+    except Exception as e:
+        return {
+            "result": f"AI Error: {str(e)}"
+        }
+
+
+@app.delete("/deployments/{dep_id}")
+def delete_deployment(dep_id: int):
+
+    db = SessionLocal()
+
+    try:
+        dep = db.query(Deployment).get(dep_id)
+
+        if not dep:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        db.delete(dep)
+        db.commit()
+
+        return {"msg": "deleted"}
+
+    finally:
+        db.close()

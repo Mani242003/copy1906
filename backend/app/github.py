@@ -2,6 +2,10 @@ import requests
 import os
 import time
 
+import zipfile
+import io
+
+
 # ✅ ----------- PAYLOAD FUNCTIONS -----------
 
 # def frontend_build_payload(release):
@@ -162,7 +166,11 @@ def wait_for_build_completion(repo, workflow_file, old_ids):
                 print(f"STATUS: {status} | RESULT: {conclusion}")
 
                 if status == "completed":
-                    return conclusion == "success"
+                    return {
+                        "success": conclusion == "success",
+                        "run_id": new_run_id
+                    }
+
 
         time.sleep(5)
         
@@ -194,3 +202,60 @@ def get_workflows(repo):
             })
 
     return workflows
+
+
+
+
+def get_workflow_logs(repo, run_id):
+
+    url = f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/logs"
+
+    headers = {
+        "Authorization": f"token {os.getenv('GITHUB_TOKEN')}"
+    }
+
+    res = requests.get(url, headers=headers)
+
+    if res.status_code != 200:
+        return f"Failed to fetch logs: {res.text}"
+
+    try:
+        z = zipfile.ZipFile(io.BytesIO(res.content))
+
+        files = sorted(z.namelist())   # ✅ important
+
+        logs = ""
+
+        # ✅ ONLY READ LAST 2 FILES (error usually here)
+        for file in files[-2:]:
+
+            with z.open(file) as f:
+                content = f.read().decode("utf-8", errors="ignore")
+
+                logs += f"\n\n===== {file} =====\n\n"
+                logs += content
+
+        # ✅ take LAST part (error zone)
+        return logs[-6000:]
+
+    except Exception as e:
+        return f"Error extracting logs: {str(e)}"
+# later Understanding
+
+# ✅ ✅ WHY THIS WORKS
+# 🔥 Key changes:
+# ✅ sorted(z.namelist())
+# → ensures correct order
+# ✅ files[-2:]
+# → picks LAST files (where errors happen)
+# ✅ logs[-6000:]
+# → keeps END part (error lines)
+
+# ✅ AFTER THIS FIX
+# 👉 Your logs WILL look like:
+# ===== 2_build.txt =====
+
+# Run npm run build
+# Error: Cannot find module 'next/link'
+# TypeScript error in page.tsx
+
