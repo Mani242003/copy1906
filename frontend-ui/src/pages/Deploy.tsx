@@ -20,12 +20,12 @@ export default function Deploy() {
       });
   }, []);
 
-  
-useEffect(() => {
-  const close = () => setOpenMenu(null);
-  window.addEventListener("click", close);
-  return () => window.removeEventListener("click", close);
-}, []);
+
+  useEffect(() => {
+    const close = () => setOpenMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
 
 
   useEffect(() => {
@@ -85,6 +85,42 @@ useEffect(() => {
 
   }, [project, location.search]);
 
+  useEffect(() => {
+
+    if (!history || history.length === 0) {
+      setSelectedHistory(null);
+      setChat([]);
+      return;
+    }
+
+    // ✅ take latest (or first)
+    const first = history[0];
+
+    let inputsParsed = {};
+    let chatData: any[] = [];
+
+    try {
+      inputsParsed = first.inputs ? JSON.parse(first.inputs) : {};
+    } catch {
+      inputsParsed = {};
+    }
+
+    try {
+      chatData = first.chat_history ? JSON.parse(first.chat_history) : [];
+      if (!Array.isArray(chatData)) chatData = [];
+    } catch {
+      chatData = [];
+    }
+
+    setSelectedHistory({
+      ...first,
+      inputs: inputsParsed
+    });
+
+    setChat(chatData);
+
+  }, [history]);
+  ``
   if (!project) return <div>Loading...</div>;
 
   const workflows = JSON.parse(project.workflows || "{}");
@@ -127,128 +163,128 @@ useEffect(() => {
 
           {history.map((h) => {
 
-  const statusColor =
-    h.status === "success" ? "text-green-400" :
-    h.status === "failed" ? "text-red-400" :
-    "text-yellow-400";
+            const statusColor =
+              h.status === "success" ? "text-green-400" :
+                h.status === "failed" ? "text-red-400" :
+                  "text-yellow-400";
 
-  return (
-    <div
-      key={h.id}
-      className={`relative p-3 rounded cursor-pointer transition hover:bg-[#1f1f1f]
+            return (
+              <div
+                key={h.id}
+                className={`relative p-3 rounded cursor-pointer transition hover:bg-[#1f1f1f]
         ${selectedHistory?.id === h.id ? "bg-[#1f1f1f]" : ""}
       `}
-    >
+              >
 
-      {/* ✅ CLICK AREA */}
-      <div
-       onClick={() => {
+                {/* ✅ CLICK AREA */}
+                <div
+                  onClick={() => {
 
-  let inputsParsed = {};
-  let chatData: any[] = [];
+                    let inputsParsed = {};
+                    let chatData: any[] = [];
 
-  try {
-    inputsParsed = h.inputs ? JSON.parse(h.inputs) : {};
-  } catch {
-    inputsParsed = {};
-  }
+                    try {
+                      inputsParsed = h.inputs ? JSON.parse(h.inputs) : {};
+                    } catch {
+                      inputsParsed = {};
+                    }
 
-  try {
-    chatData = h.chat_history ? JSON.parse(h.chat_history) : [];
-    if (!Array.isArray(chatData)) chatData = [];
-  } catch {
-    chatData = [];
-  }
+                    try {
+                      chatData = h.chat_history ? JSON.parse(h.chat_history) : [];
+                      if (!Array.isArray(chatData)) chatData = [];
+                    } catch {
+                      chatData = [];
+                    }
 
-  setSelectedHistory({
-    ...h,
-    inputs: inputsParsed
-  });
+                    setSelectedHistory({
+                      ...h,
+                      inputs: inputsParsed
+                    });
 
-  setChat(chatData);
-}}
-      >
+                    setChat(chatData);
+                  }}
+                >
 
-        <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center">
 
-          <span className="text-sm">{h.workflow}</span>
+                    <span className="text-sm">{h.workflow}</span>
 
-          {/* ✅ RIGHT SIDE (STATUS + MENU) */}
-          <div className="flex items-center gap-2">
+                    {/* ✅ RIGHT SIDE (STATUS + MENU) */}
+                    <div className="flex items-center gap-2">
 
-            <span className={`text-xs ${statusColor}`}>
-              ● {h.status}
-            </span>
+                      <span className={`text-xs ${statusColor}`}>
+                        ● {h.status}
+                      </span>
 
-            {/* ✅ 3 DOT MENU BUTTON */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenMenu(h.id);
-              }}
-              className="px-2 text-gray-400 hover:text-white"
-            >
-              ⋮
-            </button>
+                      {/* ✅ 3 DOT MENU BUTTON */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenu(h.id);
+                        }}
+                        className="px-2 text-gray-400 hover:text-white"
+                      >
+                        ⋮
+                      </button>
 
-          </div>
+                    </div>
 
-        </div>
+                  </div>
 
-        <div className="text-xs text-gray-500 mt-1">
-          ID: {h.id}
-        </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    ID: {h.id}
+                  </div>
 
-      </div>
+                </div>
 
-      {/* ✅ RETRY BUTTON */}
-      <button
-        className="mt-2 text-xs bg-gray-700 px-2 py-1 rounded"
-        onClick={async (e) => {
-          e.stopPropagation();
+                {/* ✅ RETRY BUTTON */}
+                <button
+                  className="mt-2 text-xs bg-gray-700 px-2 py-1 rounded"
+                  onClick={async (e) => {
+                    e.stopPropagation();
 
-          await axios.post(`http://localhost:8000/retry/${h.id}`);
-          alert("Retry triggered ✅");
-        }}
-      >
-        Retry
-      </button>
+                    await axios.post(`http://localhost:8000/retry/${h.id}`);
+                    alert("Retry triggered ✅");
+                  }}
+                >
+                  Retry
+                </button>
 
-      {/* ✅ DROPDOWN MENU */}
-      {openMenu === h.id && (
-        <div className="absolute right-2 top-10 bg-[#1f1f1f] border border-gray-700 rounded shadow-lg z-50 w-32">
+                {/* ✅ DROPDOWN MENU */}
+                {openMenu === h.id && (
+                  <div className="absolute right-2 top-10 bg-[#1f1f1f] border border-gray-700 rounded shadow-lg z-50 w-32">
 
-          <button
-            className="w-full px-3 py-2 text-sm text-left hover:bg-red-600"
-            onClick={async (e) => {
-              e.stopPropagation();
+                    <button
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-red-600"
+                      onClick={async (e) => {
+                        e.stopPropagation();
 
-              if (!confirm("Delete this deployment?")) return;
+                        if (!confirm("Delete this deployment?")) return;
 
-              await axios.delete(`http://localhost:8000/deployments/${h.id}`);
+                        await axios.delete(`http://localhost:8000/deployments/${h.id}`);
 
-              // ✅ refresh list
-              const res = await axios.get(`http://localhost:8000/deployments/${id}`);
-              setHistory(res.data);
+                        // ✅ refresh list
+                        const res = await axios.get(`http://localhost:8000/deployments/${id}`);
+                        setHistory(res.data);
 
-              // ✅ clear if deleted
-              if (selectedHistory?.id === h.id) {
-                setSelectedHistory(null);
-                setChat([]);
-              }
+                        // ✅ clear if deleted
+                        if (selectedHistory?.id === h.id) {
+                          setSelectedHistory(null);
+                          setChat([]);
+                        }
 
-              setOpenMenu(null);
-            }}
-          >
-            🗑 Delete
-          </button>
+                        setOpenMenu(null);
+                      }}
+                    >
+                      🗑 Delete
+                    </button>
 
-        </div>
-      )}
+                  </div>
+                )}
 
-    </div>
-  );
-})}
+              </div>
+            );
+          })}
 
 
         </div>
@@ -322,73 +358,98 @@ useEffect(() => {
             <div className="w-full max-w-3xl mx-auto space-y-4">
 
               {/* ✅ HEADER */}
-
               <div className="text-xl font-bold">
                 🤖 Deployment Assistant
               </div>
 
-              <div className="bg-[#2a2a2a] p-4 rounded">
-                <div className="text-sm font-semibold mb-2 text-gray-300">
-                  📦 Inputs
+              {/* ✅ RUNNING STATE LOADER */}
+              {selectedHistory.status === "running" ? (
+
+                <div className="bg-[#2a2a2a] p-6 rounded text-gray-300">
+
+                  <div className="text-sm mb-2">
+                    ⏳ Running deployment...
+                  </div>
+
+                  {/* ✅ ChatGPT-style blinking cursor */}
+                  <div className="text-sm font-mono">
+                    Analyzing logs<span className="inline-block w-2 animate-bounce">▌</span>
+                  </div>
+
                 </div>
 
-                {Object.keys(selectedHistory.inputs || {}).length === 0 ? (
-                  <div className="text-gray-500 text-sm">No inputs provided</div>
-                ) : (
-                  Object.keys(selectedHistory.inputs || {}).map((k) => (
-                    <div key={k} className="text-sm">
-                      <span className="text-gray-400">{k}:</span>{" "}
-                      <span>{selectedHistory.inputs[k]}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-              <hr className="border-gray-700" />
-
-              {/* ✅ CHAT ONLY */}
-              {chat.length === 0 ? (
-                <div className="text-gray-400 text-sm">
-                  No chat history available
-                </div>
               ) : (
 
-                Array.isArray(chat) && chat.map((msg, i) => {
-
-                  const isAI = msg?.role === "ai";
-                  const isRetry = typeof msg.message === "string" && msg.message.includes("RETRY");
-
-                  return (
-                    <div
-                      key={i}
-                      className={`p-3 rounded max-w-[75%] text-sm ${isAI
-                        ? "bg-blue-900 ml-auto border border-blue-400"
-                        : isRetry
-                          ? "bg-yellow-700 text-black mx-auto text-center"
-                          : "bg-[#2a2a2a]"
-                        }`}
-                    >
-
-                      <div className="text-xs text-gray-400 mb-1">
-                        {msg.role.toUpperCase()}
-                      </div>
-
-                    <pre className="whitespace-pre-wrap">
-  {typeof msg?.message === "string"
-    ? msg.message
-    : msg?.message?.output
-    ? msg.message.output
-    : JSON.stringify(msg?.message || "⚠️ No message")}
-</pre>
-
+                <>
+                  {/* ✅ INPUTS */}
+                  <div className="bg-[#2a2a2a] p-4 rounded">
+                    <div className="text-sm font-semibold mb-2 text-gray-300">
+                      📦 Inputs
                     </div>
-                  );
-                })
+
+                    {Object.keys(selectedHistory.inputs || {}).length === 0 ? (
+                      <div className="text-gray-500 text-sm">No inputs provided</div>
+                    ) : (
+                      Object.keys(selectedHistory.inputs).map((k) => (
+                        <div key={k} className="text-sm">
+                          <span className="text-gray-400">{k}:</span>{" "}
+                          <span>{selectedHistory.inputs[k]}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <hr className="border-gray-700" />
+
+                  {/* ✅ CHAT */}
+                  {chat.length === 0 ? (
+                    <div className="text-gray-400 text-sm">
+                      No chat history available
+                    </div>
+                  ) : (
+
+                    Array.isArray(chat) && chat.map((msg, i) => {
+
+                      const isAI = msg?.role === "ai";
+                      const isRetry =
+                        typeof msg?.message === "string" &&
+                        msg.message.includes("RETRY");
+
+                      return (
+                        <div
+                          key={i}
+                          className={`p-3 rounded max-w-[75%] text-sm ${isAI
+                              ? "bg-blue-900 ml-auto border border-blue-400"
+                              : isRetry
+                                ? "bg-yellow-700 text-black mx-auto text-center"
+                                : "bg-[#2a2a2a]"
+                            }`}
+                        >
+
+                          <div className="text-xs text-gray-400 mb-1">
+                            {msg?.role?.toUpperCase?.() || "SYSTEM"}
+                          </div>
+
+                          <pre className="whitespace-pre-wrap">
+                            {typeof msg?.message === "string"
+                              ? msg.message
+                              : msg?.message?.output
+                                ? msg.message.output
+                                : JSON.stringify(msg?.message || "⚠️ No message")}
+                          </pre>
+
+                        </div>
+                      );
+                    })
+
+                  )}
+                </>
 
               )}
-
             </div>
 
           ) : (
+
 
             // ✅ EMPTY STATE
             <div className="w-full h-full flex items-center justify-center text-gray-400">

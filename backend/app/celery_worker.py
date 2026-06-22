@@ -45,7 +45,8 @@ def trigger_deployment(form_data, workflow_file, repo, dep_id):
 
         # ✅ STEP 4: AI
         ai_data = analyze_logs(logs)
-        ai_result = ai_data.get("output")
+        if not ai_result or len(ai_result) > 1500:
+            ai_result = "⚠️ AI response unavailable (limit reached or invalid response)"
 
         if not ai_result:
             ai_result = "⚠️ Sorry, AI limit reached. Please try again later."
